@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Laboratory - Simulasi Kromatografi Gas</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        },
+                        techDark: '#0f172a',
+                        techCard: '#1e293b',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glow-emerald {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+        }
+
+        .glow-red {
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #10b981;
+        }
+
+        /* Animation Keyframes */
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.03);
+            }
+        }
+
+        .animate-pulse-glow {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+
+        @keyframes flowParticles {
+            0% {
+                stroke-dashoffset: 100;
+            }
+
+            100% {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .animate-flow {
+            stroke-dasharray: 8, 8;
+            animation: flowParticles 2s linear infinite;
+        }
+
+        html.gclab-auth #login-overlay {
+            display: none !important;
+        }
+
+        html:not(.gclab-auth) body {
+            overflow: hidden;
+        }
+    </style>
+    <script>
+        if (sessionStorage.getItem('gclab_authenticated') === 'true') {
+            document.documentElement.classList.add('gclab-auth');
+        }
+    </script>
+</head>
+
+<body
+    class="min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-emerald-500 selection:text-white">
+
+    <!-- LOGIN OVERLAY (MUNCUL SAAT BELUM TERAUTENTIKASI) -->
+    <div id="login-overlay"
+        class="fixed inset-0 z-[100] bg-[#0f172a] flex items-center justify-center p-4 overflow-y-auto">
+        <div class="pointer-events-none fixed inset-0 overflow-hidden">
+            <div class="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl"></div>
+        </div>
+
+        <div
+            class="relative w-full max-w-md glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/30 glow-emerald space-y-6">
+            <div class="text-center space-y-3">
+                <div
+                    class="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-900/40">
+                    <i class="fa-solid fa-flask-vial text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold tracking-tight text-white">
+                        GC <span class="text-emerald-400">Lab</span>
+                    </h1>
+                    <p class="text-xs text-emerald-400/80 font-medium tracking-wide">Virtual Separation Chemistry</p>
+                </div>
+                <div
+                    class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-3.5 py-1 rounded-full text-xs font-semibold">
+                    <i class="fa-solid fa-lock text-emerald-400"></i>
+                    <span>Login Akses Laboratorium Virtual</span>
+                </div>
+            </div>
+
+            <form id="login-form" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div class="space-y-1.5">
+                    <label for="login-username"
+                        class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                        Username
+                    </label>
+                    <div class="relative">
+                        <span
+                            class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="fa-solid fa-user text-sm"></i>
+                        </span>
+                        <input id="login-username" type="text" required autocomplete="username"
+                            placeholder="Masukkan username" oninput="clearLoginError()"
+                            class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors">
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label for="login-password"
+                        class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <span
+                            class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
+                            <i class="fa-solid fa-key text-sm"></i>
+                        </span>
+                        <input id="login-password" type="password" required autocomplete="current-password"
+                            placeholder="Masukkan password" oninput="clearLoginError()"
+                            class="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-11 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors">
+                        <button type="button" id="toggle-password-btn" onclick="togglePasswordVisibility()"
+                            aria-label="Tampilkan atau sembunyikan password"
+                            class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-emerald-400 transition-colors">
+                            <i id="toggle-password-icon" class="fa-solid fa-eye text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="login-error"
+                    class="hidden p-3 rounded-xl bg-rose-950/60 border border-rose-500/50 text-xs text-rose-300 flex items-start space-x-2">
+                    <i class="fa-solid fa-circle-exclamation mt-0.5 text-rose-400"></i>
+                    <span id="login-error-text">Username atau password salah. Silakan coba lagi.</span>
+                </div>
+
+                <button type="submit" id="login-submit-btn"
+                    class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-sm sm:text-base shadow-lg shadow-emerald-500/25 transition-all duration-200 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Masuk Laboratorium</span>
+                </button>
+            </form>
+
+            <p class="text-center text-[11px] text-slate-500">
+                Laboratorium Kimia Analitik • Simulasi Kromatografi Gas
+            </p>
+        </div>
+    </div>
+
+    <!-- NAVIGATION BAR -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo & Brand -->
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('home')">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-900/40">
+                        <i class="fa-solid fa-flask-vial text-2xl text-slate-950"></i>
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold tracking-tight text-white block leading-none">GC <span
+                                class="text-emerald-400 font-extrabold">Lab</span></span>
+                        <span class="text-xs text-emerald-400/80 font-medium tracking-wide">Virtual Separation
+                            Chemistry</span>
+                    </div>
+                </div>
+
+                <!-- Desktop Navigation Links -->
+                <nav class="hidden md:flex items-center space-x-1">
+                    <button onclick="navigateTo('home')" id="nav-home"
+                        class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
+                        <i class="fa-solid fa-house mr-2"></i>Home
+                    </button>
+                    <button onclick="navigateTo('intro')" id="nav-intro"
+                        class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200">
+                        <i class="fa-solid fa-book-open mr-2"></i>Pengantar GC
+                    </button>
+                    <button onclick="navigateTo('instrument')" id="nav-instrument"
+                        class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200">
+                        <i class="fa-solid fa-microscope mr-2"></i>Komponen Alat
+                    </button>
+                    <a href="/simulasi.html" id="nav-simulation"
+                        class="nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200">
+                        <i class="fa-solid fa-flask-glass-test mr-2"></i>Simulasi Virtual
+                    </a>
+                </nav>
+
+                <!-- Status Badge & Logout -->
+                <div class="hidden md:flex items-center space-x-3">
+                    <div
+                        class="hidden lg:flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-full border border-emerald-500/30 text-xs text-emerald-300">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Modul Kimia Pemisahan</span>
+                    </div>
+                    <button onclick="logoutGCLab()"
+                        class="px-3.5 py-2 rounded-lg text-sm font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 hover:text-rose-200 transition-all duration-200 flex items-center space-x-2">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Keluar</span>
+                    </button>
+                </div>
+
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-btn" onclick="toggleMobileMenu()"
+                        class="text-slate-300 hover:text-white p-2">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div id="mobile-menu"
+            class="hidden md:hidden bg-slate-900/95 border-b border-slate-800 px-4 pt-2 pb-4 space-y-2">
+            <button onclick="navigateTo('home'); toggleMobileMenu()"
+                class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold text-emerald-400 bg-emerald-900/20">Home</button>
+            <button onclick="navigateTo('intro'); toggleMobileMenu()"
+                class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800">Pengantar
+                GC</button>
+            <button onclick="navigateTo('instrument'); toggleMobileMenu()"
+                class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800">Komponen
+                Alat</button>
+            <a href="/simulasi.html" onclick="toggleMobileMenu()"
+                class="block w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-300 hover:bg-slate-800">Simulasi
+                Virtual</a>
+            <button onclick="logoutGCLab(); toggleMobileMenu()"
+                class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold text-rose-300 hover:bg-rose-500/10 flex items-center space-x-2">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Keluar</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow">
+        <!-- ============================================================ -->
+        <!-- HALAMAN 1: HALAMAN PEMBUKA (HOME)                            -->
+        <!-- ============================================================ -->
+        <section id="page-home"
+            class="page-section min-h-[calc(100vh-80px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+            <div class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
+                <!-- Text Content Left -->
+                <div class="lg:col-span-7 space-y-8">
+                    <div
+                        class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold">
+                        <i class="fa-solid fa-microscope text-emerald-400"></i>
+                        <span>Platform Pembelajaran Analisis Instrumen</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-none">
+                            Gas Chromatography <br>
+                            <span
+                                class="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">Virtual
+                                Laboratory</span>
+                        </h1>
+                        <p class="text-lg sm:text-xl text-slate-300 font-medium leading-relaxed">
+                            Virtual Simulation of Gas Chromatography for Analytical Chemistry
+                        </p>
+                    </div>
+
+                    <p
+                        class="text-slate-400 text-sm sm:text-base leading-relaxed bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                        Laboratorium virtual ini memungkinkan mahasiswa melakukan simulasi analisis menggunakan
+                        instrumen Gas Chromatography (GC) secara interaktif untuk memahami prinsip pemisahan
+                        fisiko-kimia dan optimasi parameter eksperimen.
+                    </p>
+
+                    <!-- Key Benefits Icons -->
+                    <div class="grid grid-cols-3 gap-4 pt-2">
+                        <div class="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60 text-center">
+                            <i class="fa-solid fa-chart-bar text-emerald-400 text-xl mb-1"></i>
+                            <p class="text-xs font-semibold text-slate-200">Resolusi Tinggi</p>
+                        </div>
+                        <div class="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60 text-center">
+                            <i class="fa-solid fa-sliders text-amber-400 text-xl mb-1"></i>
+                            <p class="text-xs font-semibold text-slate-200">Parameter Realistis</p>
+                        </div>
+                        <div class="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60 text-center">
+                            <i class="fa-solid fa-chart-line text-cyan-400 text-xl mb-1"></i>
+                            <p class="text-xs font-semibold text-slate-200">Data Interaktif</p>
+                        </div>
+                    </div>
+
+                    <!-- Call To Action Button -->
+                    <div class="pt-4">
+                        <button onclick="navigateTo('intro')"
+                            class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all duration-300 hover:scale-105 flex items-center justify-center space-x-3 group">
+                            <span>Mulai Virtual Lab</span>
+                            <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Graphic Illustration Right -->
+                <div class="lg:col-span-5 relative flex justify-center">
+                    <div
+                        class="relative w-full max-w-md bg-slate-800/80 rounded-3xl p-6 border border-emerald-500/30 glow-emerald animate-pulse-glow">
+
+                        <!-- Illustration Decorative Elements -->
+                        <div class="absolute -top-6 -right-6 w-20 h-20 bg-emerald-500/20 rounded-full blur-xl"></div>
+                        <div class="absolute -bottom-6 -left-6 w-24 h-24 bg-cyan-500/20 rounded-full blur-xl"></div>
+
+                        <!-- GC Main Digital Screen Design -->
+                        <div class="bg-slate-900 rounded-2xl p-5 border border-slate-700 space-y-4">
+                            <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                                    <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                </div>
+                                <span class="text-xs font-mono text-emerald-400">GC-2026-PRO-EDITION</span>
+                            </div>
+
+                            <!-- Mock Chromatogram Preview -->
+                            <div
+                                class="h-36 bg-slate-950/80 rounded-xl p-3 relative flex items-end overflow-hidden border border-slate-800">
+                                <div
+                                    class="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:12px_12px] opacity-20">
+                                </div>
+                                <!-- Mock Peak Wave SVG -->
+                                <svg class="w-full h-full relative z-10" viewBox="0 0 300 100"
+                                    preserveAspectRatio="none">
+                                    <path
+                                        d="M 0 90 L 40 90 L 50 20 L 60 90 L 110 90 L 125 10 L 140 90 L 200 90 L 215 35 L 230 90 L 300 90"
+                                        fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" />
+                                </svg>
+                            </div>
+
+                            <!-- Eco Metrics Indicator -->
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div class="bg-slate-800 p-3 rounded-xl border border-emerald-500/20">
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">System
+                                        Status</p>
+                                    <p class="text-xl font-bold text-emerald-400">READY <i
+                                            class="fa-solid fa-check text-xs"></i></p>
+                                </div>
+                                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Oven
+                                        Status</p>
+                                    <p class="text-sm font-bold text-cyan-300">Active / Standby</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Floating Badges -->
+                        <div class="mt-4 flex items-center justify-between text-xs text-slate-300 px-2">
+                            <span class="flex items-center space-x-1.5">
+                                <i class="fa-solid fa-atom text-emerald-400"></i>
+                                <span>High Resolution</span>
+                            </span>
+                            <span class="flex items-center space-x-1.5">
+                                <i class="fa-solid fa-shield-halved text-teal-400"></i>
+                                <span>University Standard</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- HALAMAN 2: PENGANTAR KROMATOGRAFI GAS                         -->
+        <!-- ============================================================ -->
+        <section id="page-intro" class="page-section hidden py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10">
+
+            <!-- Section Header -->
+            <div class="text-center max-w-3xl mx-auto space-y-3">
+                <span
+                    class="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold uppercase tracking-wider">Modul
+                    Pembelajaran 1</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white">Pengantar Gas Chromatography (GC)</h2>
+                <p class="text-slate-400 text-sm sm:text-base">Pahami konsep dasar, mekanisme pemisahan, dan terminologi
+                    penting dalam kromatografi gas.</p>
+            </div>
+
+            <!-- Content Card 1: Pengertian -->
+            <div class="glass-panel rounded-2xl p-6 sm:p-8 border border-slate-800 space-y-4">
+                <div class="flex items-center space-x-3">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                        1</div>
+                    <h3 class="text-xl font-bold text-white">Pengertian Gas Chromatography</h3>
+                </div>
+                <p class="text-slate-300 leading-relaxed text-sm sm:text-base pl-0 sm:pl-13">
+                    <strong class="text-emerald-400 font-semibold">Gas Chromatography (GC)</strong> atau Kromatografi
+                    Gas merupakan teknik analisis pemisahan fisiko-kimia yang digunakan untuk memisahkan dan
+                    mengidentifikasi komponen volatil dalam suatu sampel. Pemisahan terjadi berdasarkan perbedaan
+                    distribusi sampel di antara dua fase: <span class="text-cyan-300 font-semibold">Fase Diam
+                        (Stationary Phase)</span> yang berada di dalam kolom dan <span
+                        class="text-emerald-300 font-semibold">Fase Gerak (Mobile Phase)</span> berupa gas inert
+                    pencarier.
+                </p>
+            </div>
+
+            <!-- Content Card 2: Prinsip Kerja GC Flow Diagram -->
+            <div class="glass-panel rounded-2xl p-6 sm:p-8 border border-slate-800 space-y-6">
+                <div class="flex items-center space-x-3">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                        2</div>
+                    <h3 class="text-xl font-bold text-white">Prinsip Kerja & Alur Analisis GC</h3>
+                </div>
+
+                <!-- Interactive Step Flow Layout -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+                    <!-- Step 1 -->
+                    <div
+                        class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-center hover:border-emerald-500/50 transition-all">
+                        <div
+                            class="w-8 h-8 mx-auto mb-2 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                            A</div>
+                        <p class="font-bold text-sm text-white">Sampel</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Injeksi larutan mikro</p>
+                    </div>
+                    <!-- Arrow -->
+                    <div class="hidden lg:flex items-center justify-center text-slate-600">↓</div>
+                    <!-- Step 2 -->
+                    <div
+                        class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-center hover:border-emerald-500/50 transition-all">
+                        <div
+                            class="w-8 h-8 mx-auto mb-2 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                            B</div>
+                        <p class="font-bold text-sm text-white">Injector</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Penguapan sampel</p>
+                    </div>
+                    <!-- Arrow -->
+                    <div class="hidden lg:flex items-center justify-center text-slate-600">↓</div>
+                    <!-- Step 3 -->
+                    <div
+                        class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-center hover:border-emerald-500/50 transition-all">
+                        <div
+                            class="w-8 h-8 mx-auto mb-2 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                            C</div>
+                        <p class="font-bold text-sm text-white">Kolom GC</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Interaksi pemisahan</p>
+                    </div>
+                    <!-- Arrow -->
+                    <div class="hidden lg:flex items-center justify-center text-slate-600">↓</div>
+                    <!-- Step 4 -->
+                    <div
+                        class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-center hover:border-emerald-500/50 transition-all">
+                        <div
+                            class="w-8 h-8 mx-auto mb-2 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                            D</div>
+                        <p class="font-bold text-sm text-white">Detektor</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Perekaman sinyal</p>
+                    </div>
+                    <!-- Arrow -->
+                    <div class="hidden lg:flex items-center justify-center text-slate-600">↓</div>
+                    <!-- Step 5 -->
+                    <div
+                        class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 text-center col-span-2 md:col-span-1 border-emerald-500/40 bg-emerald-950/20">
+                        <div
+                            class="w-8 h-8 mx-auto mb-2 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-xs font-bold">
+                            E</div>
+                        <p class="font-bold text-sm text-emerald-300">Kromatogram</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Hasil Grafik Peak</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Card 3: Interactive Separation Demo & Concepts -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                <!-- Key Concepts (Left) -->
+                <div class="lg:col-span-6 glass-panel rounded-2xl p-6 border border-slate-800 space-y-4">
+                    <div class="flex items-center space-x-3">
+                        <div
+                            class="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                            3</div>
+                        <h3 class="text-xl font-bold text-white">Konsep Penting Kromatografi</h3>
+                    </div>
+
+                    <div class="space-y-3 pt-2">
+                        <div class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                            <h4 class="font-bold text-emerald-400 text-sm"><i class="fa-solid fa-clock mr-2"></i>Waktu
+                                Retensi (Retention Time / tR)</h4>
+                            <p class="text-xs text-slate-300 mt-1">Waktu yang dibutuhkan oleh suatu komponen terelusi
+                                dari injeksi hingga terdeteksi oleh detektor.</p>
+                        </div>
+
+                        <div class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                            <h4 class="font-bold text-cyan-400 text-sm"><i class="fa-solid fa-chart-area mr-2"></i>Luas
+                                Area Peak (Peak Area)</h4>
+                            <p class="text-xs text-slate-300 mt-1">Area di bawah kurva puncak kromatogram yang
+                                berbanding lurus dengan konsentrasi/kuantitas senyawa.</p>
+                        </div>
+
+                        <div class="p-3 bg-slate-800/60 rounded-xl border border-slate-700/80">
+                            <h4 class="font-bold text-amber-400 text-sm"><i
+                                    class="fa-solid fa-chart-line mr-2"></i>Kromatogram & Identifikasi</h4>
+                            <p class="text-xs text-slate-300 mt-1">Plot respon detektor terhadap waktu retensi. Setiap
+                                puncak mewakili jenis senyawa terpisah yang unik.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Animation Separation Box (Right) -->
+                <div
+                    class="lg:col-span-6 glass-panel rounded-2xl p-6 border border-emerald-500/30 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-base font-bold text-white flex items-center">
+                                <i class="fa-solid fa-film text-emerald-400 mr-2"></i>
+                                Simulasi Animasi Pemisahan Dalam Kolom
+                            </h3>
+                            <button onclick="playIntroAnimation()"
+                                class="px-3 py-1 bg-emerald-500 text-slate-950 rounded-lg font-bold text-xs hover:bg-emerald-400 transition-all">
+                                <i class="fa-solid fa-play mr-1"></i> Putar Simulasi
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-4">
+                            Perhatikan bagaimana partikel sampel dengan kepolaran berbeda terpisah sepanjang kolom
+                            kapiler karena perbedaan retensi.
+                        </p>
+
+                        <!-- Canvas Animation Area -->
+                        <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 relative">
+                            <canvas id="introAnimationCanvas" width="450" height="120" class="w-full h-28"></canvas>
+                            <div class="flex justify-between text-[10px] text-slate-400 mt-2 px-1">
+                                <span>Port Injeksi (Awal)</span>
+                                <span class="text-emerald-400 font-semibold">Panjang Kolom Kapiler</span>
+                                <span>Detektor (Akhir)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div
+                        class="flex items-center justify-around pt-4 text-xs text-slate-300 border-t border-slate-800 mt-4">
+                        <span class="flex items-center"><span
+                                class="w-3 h-3 rounded-full bg-cyan-400 inline-block mr-1.5"></span> Senyawa A (Cepat /
+                            Non-Polar)</span>
+                        <span class="flex items-center"><span
+                                class="w-3 h-3 rounded-full bg-amber-400 inline-block mr-1.5"></span> Senyawa B
+                            (Sedang)</span>
+                        <span class="flex items-center"><span
+                                class="w-3 h-3 rounded-full bg-red-400 inline-block mr-1.5"></span> Senyawa C (Lambat /
+                            Polar)</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Navigation Button -->
+            <div class="flex justify-end pt-4">
+                <button onclick="navigateTo('instrument')"
+                    class="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-base transition-all flex items-center space-x-2 shadow-lg shadow-emerald-500/20">
+                    <span>Lanjut Mengenal Instrumen</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- HALAMAN 3: PENGENALAN ALAT GC                                -->
+        <!-- ============================================================ -->
+        <section id="page-instrument"
+            class="page-section hidden py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+
+            <div class="text-center max-w-3xl mx-auto space-y-3">
+                <span
+                    class="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold uppercase tracking-wider">Modul
+                    Pembelajaran 2</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white">Pengenalan Komponen Instrumen GC</h2>
+                <p class="text-slate-400 text-sm sm:text-base">Klik pada komponen diagram instrumen di bawah ini untuk
+                    mempelajari detail dan fungsi masing-masing bagian.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+                <!-- Interactive Diagram Area (Left) -->
+                <div class="lg:col-span-7 glass-panel rounded-2xl p-6 border border-slate-800">
+                    <h3
+                        class="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-4 flex items-center justify-between">
+                        <span><i class="fa-solid fa-hand-pointer mr-2"></i>Diagram Interaktif Gas Chromatograph</span>
+                        <span class="text-xs text-slate-400 font-normal">Klik hotspot (1-6)</span>
+                    </h3>
+
+                    <!-- Interactive Instrument Schematic SVG Container -->
+                    <div
+                        class="relative bg-slate-950 rounded-xl p-4 border border-slate-800 overflow-hidden flex justify-center">
+                        <svg viewBox="0 0 600 400" class="w-full h-auto max-h-[380px]">
+                            <!-- Background Gas Lines -->
+                            <path d="M 100 200 L 180 200 L 180 150 L 260 150" fill="none" stroke="#0284c7"
+                                stroke-width="4" class="animate-flow" />
+                            <path d="M 400 180 L 480 180" fill="none" stroke="#10b981" stroke-width="4"
+                                class="animate-flow" />
+
+                            <!-- 1. Carrier Gas Cylinder -->
+                            <g class="cursor-pointer group" onclick="selectComponent(1)">
+                                <rect x="50" y="120" width="60" height="160" rx="10" fill="#1e293b" stroke="#0284c7"
+                                    stroke-width="2" class="group-hover:fill-slate-800 transition-all" />
+                                <rect x="70" y="90" width="20" height="30" rx="3" fill="#64748b" />
+                                <circle cx="80" cy="80" r="12" fill="#0284c7" />
+                                <text x="80" y="210" fill="#94a3b8" font-size="11" font-weight="bold"
+                                    text-anchor="middle">GAS</text>
+                            </g>
+
+                            <!-- 2. Injector Port -->
+                            <g class="cursor-pointer group" onclick="selectComponent(2)">
+                                <rect x="160" y="120" width="40" height="70" rx="5" fill="#334155" stroke="#f59e0b"
+                                    stroke-width="2" class="group-hover:fill-slate-700 transition-all" />
+                                <path d="M 180 95 L 180 120" stroke="#f59e0b" stroke-width="3" stroke-dasharray="2,2" />
+                                <polygon points="175,95 185,95 180,85" fill="#f59e0b" />
+                                <text x="180" y="160" fill="#fef08a" font-size="10" font-weight="bold"
+                                    text-anchor="middle">INJ</text>
+                            </g>
+
+                            <!-- 3. Oven Box & 4. Column Inside -->
+                            <g class="cursor-pointer group" onclick="selectComponent(3)">
+                                <rect x="230" y="100" width="180" height="180" rx="12" fill="#0f172a" stroke="#ef4444"
+                                    stroke-width="2" class="group-hover:stroke-amber-400 transition-all" />
+                                <text x="320" y="125" fill="#f87171" font-size="11" font-weight="bold"
+                                    text-anchor="middle">GC OVEN</text>
+                            </g>
+
+                            <!-- Column Coil (Component 4) -->
+                            <g class="cursor-pointer group" onclick="selectComponent(4)">
+                                <circle cx="320" cy="200" r="45" fill="none" stroke="#10b981" stroke-width="6"
+                                    class="group-hover:stroke-emerald-300 transition-all" />
+                                <circle cx="320" cy="200" r="35" fill="none" stroke="#059669" stroke-width="5" />
+                                <circle cx="320" cy="200" r="25" fill="none" stroke="#047857" stroke-width="4" />
+                                <text x="320" y="204" fill="#a7f3d0" font-size="10" font-weight="bold"
+                                    text-anchor="middle">COLUMN</text>
+                            </g>
+
+                            <!-- 5. Detector -->
+                            <g class="cursor-pointer group" onclick="selectComponent(5)">
+                                <rect x="440" y="140" width="50" height="80" rx="6" fill="#334155" stroke="#a855f7"
+                                    stroke-width="2" class="group-hover:fill-slate-700 transition-all" />
+                                <circle cx="465" cy="170" r="12" fill="#a855f7" opacity="0.3" />
+                                <text x="465" y="174" fill="#e9d5ff" font-size="10" font-weight="bold"
+                                    text-anchor="middle">DET</text>
+                            </g>
+
+                            <!-- 6. Computer / Data System -->
+                            <g class="cursor-pointer group" onclick="selectComponent(6)">
+                                <rect x="510" y="210" width="75" height="55" rx="5" fill="#1e293b" stroke="#38bdf8"
+                                    stroke-width="2" class="group-hover:fill-slate-800 transition-all" />
+                                <rect x="520" y="220" width="55" height="35" fill="#0f172a" />
+                                <path d="M 525 245 Q 535 225 545 240 T 565 230" fill="none" stroke="#38bdf8"
+                                    stroke-width="2" />
+                                <rect x="535" y="265" width="25" height="10" fill="#475569" />
+                            </g>
+
+                            <!-- Interactive Click Hotspots Pins -->
+                            <!-- Pin 1 -->
+                            <g onclick="selectComponent(1)" class="cursor-pointer">
+                                <circle cx="80" cy="140" r="12" fill="#10b981" /><text x="80" y="144" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">1</text>
+                            </g>
+                            <!-- Pin 2 -->
+                            <g onclick="selectComponent(2)" class="cursor-pointer">
+                                <circle cx="180" cy="120" r="12" fill="#10b981" /><text x="180" y="124" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">2</text>
+                            </g>
+                            <!-- Pin 3 -->
+                            <g onclick="selectComponent(3)" class="cursor-pointer">
+                                <circle cx="250" cy="120" r="12" fill="#10b981" /><text x="250" y="124" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">3</text>
+                            </g>
+                            <!-- Pin 4 -->
+                            <g onclick="selectComponent(4)" class="cursor-pointer">
+                                <circle cx="320" cy="200" r="12" fill="#10b981" /><text x="320" y="204" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">4</text>
+                            </g>
+                            <!-- Pin 5 -->
+                            <g onclick="selectComponent(5)" class="cursor-pointer">
+                                <circle cx="465" cy="140" r="12" fill="#10b981" /><text x="465" y="144" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">5</text>
+                            </g>
+                            <!-- Pin 6 -->
+                            <g onclick="selectComponent(6)" class="cursor-pointer">
+                                <circle cx="545" cy="210" r="12" fill="#10b981" /><text x="545" y="214" fill="#0f172a"
+                                    font-size="11" font-weight="extrabold" text-anchor="middle">6</text>
+                            </g>
+
+                        </svg>
+                    </div>
+
+                    <!-- Component Quick Quick Select Grid -->
+                    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-4">
+                        <button onclick="selectComponent(1)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">1.
+                            Carrier Gas</button>
+                        <button onclick="selectComponent(2)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">2.
+                            Injector</button>
+                        <button onclick="selectComponent(3)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">3.
+                            Oven</button>
+                        <button onclick="selectComponent(4)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">4.
+                            Column</button>
+                        <button onclick="selectComponent(5)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">5.
+                            Detector</button>
+                        <button onclick="selectComponent(6)"
+                            class="comp-btn p-2 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300 font-semibold hover:border-emerald-500 transition-all text-center">6.
+                            Data System</button>
+                    </div>
+                </div>
+
+                <!-- Info Detail Box (Right) -->
+                <div
+                    class="lg:col-span-5 glass-panel rounded-2xl p-6 border border-emerald-500/30 min-h-[420px] flex flex-col justify-between">
+                    <div id="component-detail-content" class="space-y-4">
+                        <!-- Dynamic content injected via JS -->
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-800">
+                        <a href="/simulasi.html"
+                            class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-base shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2">
+                            <span>Masuk Simulasi Laboratorium</span>
+                            <i class="fa-solid fa-flask text-lg"></i>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="glass-panel border-t border-slate-800 py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400 space-y-2">
+            <p class="font-semibold text-slate-300">GC Virtual Laboratory &copy; 2026 - Media Simulasi Praktikum Kimia
+                Pemisahan</p>
+            <p class="text-[11px] text-slate-500">Dirancang khusus untuk pembelajaran interaktif Kromatografi Gas pada
+                tingkat perguruan tinggi.</p>
+        </div>
+    </footer>
+
+    <!-- ============================================================ -->
+    <!-- JAVASCRIPT APPLICATION LOGIC                                 -->
+    <!-- ============================================================ -->
+    <script>
+        // APP STATE
+        let activePage = 'home';
+
+        // COMPONENT DATA FOR PAGE 3 (INSTRUMENT EXPLORER)
+        const componentsInfo = {
+            1: {
+                title: "1. Carrier Gas System (Sistem Gas Pembawa)",
+                icon: "fa-gas-pump",
+                desc: "Berfungsi sebagai fase gerak (mobile phase) inert yang membawa uap sampel melewati kolom GC tanpa bereaksi secara kimia.",
+                details: ["Gas umum: Helium (He), Nitrogen (N₂), dan Hidrogen (H₂).", "Daya dorong diatur oleh pressure regulator & flow controller."]
+            },
+            2: {
+                title: "2. Injector Port (Port Injeksi)",
+                icon: "fa-syringe",
+                desc: "Tempat memasukkan sampel mikro cair ke dalam sistem GC yang dipanaskan agar sampel seketika menguap menjadi fase gas.",
+                details: ["Suhu injector biasanya dipasang 20-50°C di atas titik didih komponen tertinggi.", "Dapat beroperasi dalam mode Split (sebagian terbuang) atau Splitless."]
+            },
+            3: {
+                title: "3. Oven GC (Termostat Kolom)",
+                icon: "fa-temperature-high",
+                desc: "Mengatur dan menjaga temperatur kolom secara presisi untuk mengontrol laju penguapan dan retensi pemisahan komponen.",
+                details: ["Bisa diatur isothermal (suhu tetap) atau pemograman suhu (temperature programming).", "Suhu tinggi mempercepat elusi namun bisa menurunkan resolusi pemisahan."]
+            },
+            4: {
+                title: "4. Column (Kolom GC Kapiler)",
+                icon: "fa-circle-nodes",
+                desc: "Jantung dari GC! Tempat terjadinya pemisahan komponen berdasarkan perbedaan interaksi partikel sampel dengan fase diam pada dinding kolom.",
+                details: ["Jenis Non-Polar (HP-5) memisahkan berdasarkan titik didih.", "Jenis Polar (DB-WAX) memisahkan berdasarkan interaksi polaritas/ikatan hidrogen."]
+            },
+            5: {
+                title: "5. Detector (Detektor)",
+                icon: "fa-bullseye",
+                desc: "Mendeteksi komponen senyawa saat terelusi keluar dari kolom dan mengubahnya menjadi sinyal listrik proporsional.",
+                details: ["Flame Ionization Detector (FID) sangat peka untuk hidrokarbon organik.", "Thermal Conductivity Detector (TCD) bersifat universal dan non-destruktif."]
+            },
+            6: {
+                title: "6. Computer & Data System",
+                icon: "fa-desktop",
+                desc: "Menghasilkan, mencatat, dan mengolah sinyal detektor menjadi grafik kromatogram digital serta menghitung luas area puncak.",
+                details: ["Mengidentifikasi waktu retensi (tR) senyawa.", "Menghitung konsentrasi kualitatif dan kuantitatif secara otomatis."]
+            }
+        };
+
+        // NAVIGATION LOGIC
+        function navigateTo(pageId) {
+            activePage = pageId;
+            document.querySelectorAll('.page-section').forEach(sec => sec.classList.add('hidden'));
+            const target = document.getElementById(`page-${pageId}`);
+            if (target) target.classList.remove('hidden');
+
+            // Update Navbar Active Style
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = "nav-btn px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200";
+            });
+            const activeBtn = document.getElementById(`nav-${pageId}`);
+            if (activeBtn) {
+                activeBtn.className = "nav-btn px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30";
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Trigger specific page initializations
+            if (pageId === 'intro') {
+                playIntroAnimation();
+            } else if (pageId === 'instrument') {
+                selectComponent(1);
+            }
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // PAGE 2: SEPARATION ANIMATION
+        let introAnimId = null;
+        function playIntroAnimation() {
+            const canvas = document.getElementById('introAnimationCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            // Cancel previous frame if any
+            if (introAnimId) cancelAnimationFrame(introAnimId);
+
+            // Particles
+            let particles = [
+                { x: 10, speed: 3.2, color: '#38bdf8', label: 'A' },
+                { x: 10, speed: 2.1, color: '#fbbf24', label: 'B' },
+                { x: 10, speed: 1.2, color: '#f87171', label: 'C' }
+            ];
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw Column Tube Background
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(10, 35, canvas.width - 20, 50);
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(10, 35, canvas.width - 20, 50);
+
+                // Stationary Phase Layer
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                ctx.fillRect(10, 35, canvas.width - 20, 10);
+                ctx.fillRect(10, 75, canvas.width - 20, 10);
+
+                // Update & Draw Particles
+                particles.forEach((p, index) => {
+                    p.x += p.speed;
+                    if (p.x > canvas.width - 25) {
+                        p.x = 10; // Loop back
+                    }
+
+                    // Render particle
+                    ctx.beginPath();
+                    ctx.arc(p.x, 60 + (index - 1) * 10, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Text inside
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = 'bold 9px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(p.label, p.x, 63 + (index - 1) * 10);
+                });
+
+                introAnimId = requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+
+        // PAGE 3: COMPONENT SELECTOR
+        function selectComponent(id) {
+            const data = componentsInfo[id];
+            if (!data) return;
+
+            const contentBox = document.getElementById('component-detail-content');
+            contentBox.innerHTML = `
+                <div class="space-y-3 animate-fade-in">
+                    <div class="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-bold">
+                        <i class="fa-solid ${data.icon}"></i>
+                        <span>Komponen #${id}</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white">${data.title}</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed">${data.desc}</p>
+                    
+                    <div class="space-y-1.5 pt-2">
+                        ${data.details.map(d => `<p class="text-xs text-slate-400 flex items-start"><i class="fa-solid fa-angle-right text-emerald-400 mr-2 mt-0.5"></i><span>${d}</span></p>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // AUTHENTICATION LOGIC (Dynamic via /auth-config.json)
+        function togglePasswordVisibility() {
+            const passInput = document.getElementById('login-password');
+            const eyeIcon = document.getElementById('toggle-password-icon');
+            if (!passInput || !eyeIcon) return;
+
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                eyeIcon.className = 'fa-solid fa-eye-slash text-sm';
+            } else {
+                passInput.type = 'password';
+                eyeIcon.className = 'fa-solid fa-eye text-sm';
+            }
+        }
+
+        function clearLoginError() {
+            const errBox = document.getElementById('login-error');
+            if (errBox) errBox.classList.add('hidden');
+        }
+
+        function showLoginError(message) {
+            const errBox = document.getElementById('login-error');
+            const errText = document.getElementById('login-error-text');
+            if (errText) errText.textContent = message;
+            if (errBox) errBox.classList.remove('hidden');
+        }
+
+        function checkAuthState() {
+            const isAuthed = sessionStorage.getItem('gclab_authenticated') === 'true';
+            const overlay = document.getElementById('login-overlay');
+            if (isAuthed) {
+                document.documentElement.classList.add('gclab-auth');
+                if (overlay) overlay.classList.add('hidden');
+            } else {
+                document.documentElement.classList.remove('gclab-auth');
+                if (overlay) overlay.classList.remove('hidden');
+            }
+        }
+
+        async function handleLoginSubmit(event) {
+            event.preventDefault();
+            clearLoginError();
+
+            const userInput = document.getElementById('login-username');
+            const passInput = document.getElementById('login-password');
+            const submitBtn = document.getElementById('login-submit-btn');
+
+            const enteredUser = userInput ? userInput.value.trim() : '';
+            const enteredPass = passInput ? passInput.value : '';
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            }
+
+            try {
+                const response = await fetch('/auth-config.json', { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error('Gagal memuat konfigurasi autentikasi');
+                }
+                const config = await response.json();
+                const validUser = String(config.username ?? '').trim();
+                const validPass = String(config.password ?? '');
+
+                if (enteredUser === validUser && enteredPass === validPass) {
+                    sessionStorage.setItem('gclab_authenticated', 'true');
+                    checkAuthState();
+                    const form = document.getElementById('login-form');
+                    if (form) form.reset();
+                    if (passInput) passInput.type = 'password';
+                    const eyeIcon = document.getElementById('toggle-password-icon');
+                    if (eyeIcon) eyeIcon.className = 'fa-solid fa-eye text-sm';
+                } else {
+                    showLoginError('Username atau password salah. Silakan coba lagi.');
+                    if (passInput) passInput.focus();
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                showLoginError('Gagal memverifikasi kredensial. Pastikan file auth-config.json tersedia.');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                }
+            }
+        }
+
+        function logoutGCLab() {
+            sessionStorage.removeItem('gclab_authenticated');
+            checkAuthState();
+            const form = document.getElementById('login-form');
+            const passInput = document.getElementById('login-password');
+            const eyeIcon = document.getElementById('toggle-password-icon');
+            if (form) form.reset();
+            if (passInput) passInput.type = 'password';
+            if (eyeIcon) eyeIcon.className = 'fa-solid fa-eye text-sm';
+            clearLoginError();
+            navigateTo('home');
+            const userInput = document.getElementById('login-username');
+            if (userInput) userInput.focus();
+        }
+
+        window.addEventListener('pageshow', checkAuthState);
+
+        window.onload = function () {
+            checkAuthState();
+            navigateTo('home');
+        }
+    </script>
+</body>
+
+</html>
